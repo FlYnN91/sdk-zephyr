@@ -56,6 +56,9 @@ LOG_MODULE_REGISTER(ktd2027);
  */
 #define KTD2027_MIN_FLASH_PERIOD 128
 
+/* Default blink period 1s */
+#define KT2027_DEFAULT_FLASH_PERIOD	2000U
+
 /* Brightness limits in percent */
 #define KTD2027_MIN_BRIGHTNESS 0
 #define KTD2027_MAX_BRIGHTNESS 100
@@ -124,6 +127,11 @@ struct ktd2027_data {
 	struct led_data dev_data;
 };
 
+static uint8_t ktd2027_regs[KTD2027_REG_L4_IOUT+1U];
+
+static inline int ktd2027_set_flash_period(const struct device* dev, uint32_t led, uint32_t ms);
+static inline int ktd2027_set_flash_duty(const struct device* dev, uint32_t led, uint32_t delay);
+
 static inline int ktd2027_led_on(const struct device *dev, uint32_t led)
 {
 	const struct ktd2027_config *config = dev->config;
@@ -131,17 +139,10 @@ static inline int ktd2027_led_on(const struct device *dev, uint32_t led)
 	if (led > KTD2027_CHANNEL_MAX) {
 		return -EINVAL;
 	}
-
-	uint8_t reg = 0;
-	if (i2c_reg_read_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,&reg))
-	{
-		LOG_ERR("Failed to read Channel Control from DTK2027");
-		return -EIO;
-	}
 	
-	reg |= KTD2027_CH_CONTROL_MASK << led;
+	ktd2027_regs[KTD2027_REG_CH_CONTROL] |= KTD2027_LED_MODE_ON << (led * 2U);	
 	
-	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,reg)){
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,ktd2027_regs[KTD2027_REG_CH_CONTROL])){
 		LOG_ERR("Failed to update Channel Control to DTK2027");
 		return -EIO;
 	}
@@ -156,22 +157,82 @@ static inline int ktd2027_led_off(const struct device *dev, uint32_t led)
 	if (led > KTD2027_CHANNEL_MAX) {
 		return -EINVAL;
 	}
-
-	uint8_t reg = 0;
-	if (i2c_reg_read_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,&reg))
-	{
-		LOG_ERR("Failed to read Channel Control from DTK2027");
-		return -EIO;
-	}
 	
-	reg &= ~(KTD2027_CH_CONTROL_MASK << led);
+	ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(KTD2027_LED_MODE_OFF << (led * 2U));
 	
-	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,reg)){
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,ktd2027_regs[KTD2027_REG_CH_CONTROL])){
 		LOG_ERR("Failed to update Channel Control to DTK2027");
 		return -EIO;
 	}
 
 	return 0;
+}
+
+static inline int ktd2027_set_led_pwm_mode(const struct device *dev, uint32_t led)
+{
+	const struct ktd2027_config *config = dev->config;
+	
+	if (led > KTD2027_CHANNEL_MAX) {
+		return -EINVAL;
+	}
+	
+	// LED OFF
+	ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(KTD2027_LED_MODE_OFF << (led * 2U));
+	// LED PWM
+	ktd2027_regs[KTD2027_REG_CH_CONTROL] |= KTD2027_LED_PWM1 << (led * 2U);
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,ktd2027_regs[KTD2027_REG_CH_CONTROL])){
+		LOG_ERR("Failed to update Channel Control to DTK2027");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static inline int ktd2027_set_flash_period(const struct device* dev, uint32_t led, uint32_t ms)
+{
+	const struct ktd2027_config *config = dev->config;
+	
+	uint8_t bin_period = ((ms - KTD2027_MIN_FLASH_PERIOD) / KTD2027_MIN_FLASH_PERIOD);
+	
+	ktd2027_regs[KTD2027_REG_FLASH_PERIOD] = bin_period & 0x7FU;
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_PERIOD,
+		ktd2027_regs[KTD2027_REG_FLASH_PERIOD])) {
+		LOG_ERR("Setting flash period failed.");
+		return -EIO;
+	}
+	
+	return 0;
+}
+
+static inline int ktd2027_set_flash_duty(const struct device* dev, uint32_t led,
+	uint32_t delay)
+{	
+const struct ktd2027_config *config = dev->config;
+	ktd2027_regs[KTD2027_REG_FLASH_ON_T1] = ((ktd2027_regs[KTD2027_REG_FLASH_PERIOD] * 100U)/delay);
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_ON_T1,
+		ktd2027_regs[KTD2027_REG_FLASH_ON_T1])) {
+		LOG_ERR("Setting flash duty failed.");
+		return -EIO;
+	}
+	
+	return 0;
+}
+
+static int ktd2027_blink(const struct device* dev, uint32_t led,
+				uint32_t delay_on, uint32_t delay_off)
+{
+	if (led > KTD2027_CHANNEL_MAX) {
+		return -EINVAL;
+	}
+	
+	ktd2027_set_led_pwm_mode(dev,led);
+	ktd2027_set_flash_period(dev,led,KT2027_DEFAULT_FLASH_PERIOD);
+	ktd2027_set_flash_duty(dev,led,delay_off);
+	
+	return 0;	
 }
 
 static int ktd2027_led_init(const struct device *dev)
@@ -190,13 +251,21 @@ static int ktd2027_led_init(const struct device *dev)
 	dev_data->max_period = KTD2027_MAX_FLASH_PERIOD;
 	dev_data->min_brightness = KTD2027_MIN_BRIGHTNESS;
 	dev_data->max_brightness = KTD2027_MAX_BRIGHTNESS;
-
+	
 	/* Default Mode: Device always on, Function do nothing */
+	ktd2027_regs[KTD2027_REG_ENABLE_RST] = ((KTD2027_ON_MODE_ALWAYS_ON << 3)| KTD2027_FUNC_DO_NOTHING);
+
 	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
-		((KTD2027_ON_MODE_ALWAYS_ON << 3)| KTD2027_FUNC_DO_NOTHING))) {
+		ktd2027_regs[KTD2027_REG_ENABLE_RST])) {
 		LOG_ERR("Enabling KTD2027 LED chip failed.");
 		return -EIO;
 	}
+	
+	/* All LEDs of at power up */
+	ktd2027_led_off(dev,0U);
+	ktd2027_led_off(dev,1U);
+	ktd2027_led_off(dev,2U);
+	ktd2027_led_off(dev,3U);
 
 	return 0;
 }
@@ -204,6 +273,7 @@ static int ktd2027_led_init(const struct device *dev)
 static const struct led_driver_api ktd2027_led_api = {
 	.on = ktd2027_led_on,
 	.off = ktd2027_led_off,
+	.blink = ktd2027_blink,
 };
 
 #define KTD2027_DEFINE(id)						\
