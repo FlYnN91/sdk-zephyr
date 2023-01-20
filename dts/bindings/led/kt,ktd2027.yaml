@@ -1,0 +1,5 @@
+description: KT KTD2027 LED
+
+compatible: "kt,ktd2027"
+
+include: i2c-device.yaml

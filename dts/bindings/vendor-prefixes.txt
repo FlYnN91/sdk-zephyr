@@ -310,6 +310,7 @@ kobol	Kobol Innovations Pte. Ltd.
 koe	Kaohsiung Opto-Electronics Inc.
 kontron	Kontron S&T AG
 kosagi	Sutajio Ko-Usagi PTE Ltd.
+kt	Kinetic Technologies
 kvaser	Kvaser
 kvg	Kverneland Group
 kyo	Kyocera Corporation

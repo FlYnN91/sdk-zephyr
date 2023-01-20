@@ -11,6 +11,7 @@ zephyr_library_sources_ifdef(CONFIG_LP503X lp503x.c)
 zephyr_library_sources_ifdef(CONFIG_LP5562 lp5562.c)
 zephyr_library_sources_ifdef(CONFIG_PCA9633 pca9633.c)
 zephyr_library_sources_ifdef(CONFIG_TLC59108 tlc59108.c)
+zephyr_library_sources_ifdef(CONFIG_KTD2027 ktd2027.c)
 
 zephyr_library_sources_ifdef(CONFIG_LED_SHELL   led_shell.c)
 

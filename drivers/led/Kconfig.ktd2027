@@ -1,0 +1,14 @@
+# Copyright (c) 2023 Dainius Narsutis <dainius@dainiusnarsutis.co.uk>
+# SPDX-License-Identifier: Apache-2.0
+
+config KTD2027
+	bool "KTD2027 LED driver"
+	default y
+	depends on LED
+	select I2C
+	help
+	  Enable LED driver for KTD2027.
+
+	  KTD2027 LED driver has 4 channels (RGBW). A
+	  total of 192 current levels are available for each channel
+	  from 0.125mA to 24mA with a 0.125mA step.
