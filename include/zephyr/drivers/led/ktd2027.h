@@ -58,6 +58,9 @@ enum ktd2027_led_mode{
 	KTD2027_LED_PWM2
 };
 
+int ktd2027_set_reset(const struct device* dev, enum ktd2027_function reset);
+int ktd2027_set_scaling(const struct device* dev, enum ktd2027_ramp_scale scale);
+int ktd2027_set_enable_mode(const struct device* dev, enum ktd2027_function mode);
 int ktd2027_set_flash_period(const struct device* dev, uint16_t period_ms);
 int ktd2027_set_ramp_mode(const struct device* dev, enum ktd2027_ramp_mode r_mode);
 int ktd2027_set_period_on_duty(const struct device* dev, uint32_t on_time);

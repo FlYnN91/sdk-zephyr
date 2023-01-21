@@ -113,6 +113,57 @@ static inline int ktd2027_set_led_pwm_mode(const struct device *dev, uint32_t le
 	return ktd2027_set_led_mode(dev,(enum ktd2027_led_channels)led, mode);
 }
 
+int ktd2027_set_reset(const struct device* dev, enum ktd2027_function reset)
+{
+	const struct ktd2027_config *config = dev->config;
+	
+	if(reset < KTD2027_FUNC_RESET_REGS)
+	{
+		return -EINVAL;
+	}
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST, (uint8_t)reset)) {
+		LOG_ERR("Reseting device failed");
+		return -EIO;
+	}
+	
+	return 0;
+}
+
+int ktd2027_set_scaling(const struct device* dev, enum ktd2027_ramp_scale scale)
+{
+	const struct ktd2027_config *config = dev->config;
+	// Reset scaling
+	ktd2027_regs[KTD2027_REG_ENABLE_RST] &= ~(KTD2027_RAMP_SCALE_NORMAL << 5U);
+	// Set new scaling
+	ktd2027_regs[KTD2027_REG_ENABLE_RST] |= (scale << 5U);
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
+		ktd2027_regs[KTD2027_REG_ENABLE_RST])) {
+		LOG_ERR("Setting scaling failed.");
+		return -EIO;
+	}
+	
+	return 0;
+}
+
+int ktd2027_set_enable_mode(const struct device* dev, enum ktd2027_function mode)
+{
+	const struct ktd2027_config *config = dev->config;
+	// Reset scaling
+	ktd2027_regs[KTD2027_REG_ENABLE_RST] &= ~(KTD2027_ON_MODE_I2C_DEFAULT << 3U);
+	// Set new scaling
+	ktd2027_regs[KTD2027_REG_ENABLE_RST] |= (mode < 3U);
+	
+	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
+		ktd2027_regs[KTD2027_REG_ENABLE_RST])) {
+		LOG_ERR("Setting scaling failed.");
+		return -EIO;
+	}
+	
+	return 0;
+}
+
 int ktd2027_set_flash_period(const struct device* dev, uint16_t period_ms)
 {
 	const struct ktd2027_config *config = dev->config;
@@ -154,7 +205,7 @@ int ktd2027_set_ramp_mode(const struct device* dev, enum ktd2027_ramp_mode r_mod
 
 int ktd2027_set_period_on_duty(const struct device* dev, uint32_t on_time)
 {	
-	struct ktd2027_config *config = dev->config;
+	const struct ktd2027_config *config = dev->config;
 	ktd2027_regs[KTD2027_REG_FLASH_ON_T1] = ((ktd2027_regs[KTD2027_REG_FLASH_PERIOD] * 100U)/on_time);
 	
 	if (i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_ON_T1,
