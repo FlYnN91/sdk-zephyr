@@ -118,11 +118,11 @@ static void st7789v_reset_display(const struct device *dev)
 
 	const struct st7789v_config *config = dev->config;
 	if (config->reset_gpio.port != NULL) {
-		k_sleep(K_MSEC(1));
-		gpio_pin_set_dt(&config->reset_gpio, 1);
-		k_sleep(K_MSEC(6));
-		gpio_pin_set_dt(&config->reset_gpio, 0);
 		k_sleep(K_MSEC(20));
+		gpio_pin_set_dt(&config->reset_gpio, 1);
+		k_sleep(K_MSEC(20));
+		gpio_pin_set_dt(&config->reset_gpio, 0);
+		k_sleep(K_MSEC(100));
 	} else {
 		st7789v_transmit(dev, ST7789V_CMD_SW_RESET, NULL, 0);
 		k_sleep(K_MSEC(5));
@@ -428,7 +428,7 @@ static const struct display_driver_api st7789v_api = {
 #define ST7789V_INIT(inst)								\
 	static const struct st7789v_config st7789v_config_ ## inst = {			\
 		.bus = SPI_DT_SPEC_INST_GET(inst, SPI_OP_MODE_MASTER |			\
-					    SPI_WORD_SET(ST7789V_WORD_SIZE(inst)), 0),	\
+		SPI_WORD_SET(ST7789V_WORD_SIZE(inst)), 0),	\
 		.cmd_data_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, cmd_data_gpios, {}),	\
 		.reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {}),		\
 		.vcom = DT_INST_PROP(inst, vcom),					\
