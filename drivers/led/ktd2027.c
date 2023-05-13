@@ -230,8 +230,8 @@ int ktd2027_set_led_mode(const struct device* dev, enum ktd2027_led_channels led
 		return -EINVAL;
 	}
 	
-	// LED OFF
-	ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(KTD2027_LED_MODE_OFF << (led * 2U));
+	// LED OFF - Reset both pins
+	ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(3U << (led * 2U));
 	// LED PWM
 	ktd2027_regs[KTD2027_REG_CH_CONTROL] |= on_mode << (led * 2U);
 	

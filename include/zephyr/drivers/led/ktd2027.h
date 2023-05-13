@@ -14,9 +14,9 @@
  * nomenclature uses RGBW, we keep it that way.
  */
 enum ktd2027_led_channels {
-	KTD2027_CHANNEL_B,
-	KTD2027_CHANNEL_G,
 	KTD2027_CHANNEL_R,
+	KTD2027_CHANNEL_G,
+	KTD2027_CHANNEL_B,
 	KTD2027_CHANNEL_W,
 	KTD2027_CHANNEL_COUNT,
 };
