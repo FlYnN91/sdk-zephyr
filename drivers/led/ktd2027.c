@@ -206,15 +206,15 @@ int ktd2027_set_ramp_mode(const struct device* dev, enum ktd2027_ramp_mode r_mod
 	
 	if(KTD2027_RAMP_LOG_S == r_mode)
 	{
-		ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(1U << 7U);
+		ktd2027_regs[KTD2027_REG_FLASH_PERIOD] &= ~(1U << 7U);
 	}
 	else
 	{
-		ktd2027_regs[KTD2027_REG_CH_CONTROL] |= (r_mode << 7U);
+		ktd2027_regs[KTD2027_REG_FLASH_PERIOD] |= (r_mode << 7U);
 	}
-	LOG_DBG("Setting Ramp Mode %d [0x%08X]",r_mode,ktd2027_regs[KTD2027_REG_CH_CONTROL]);
-	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,
-		ktd2027_regs[KTD2027_REG_CH_CONTROL]);
+	LOG_DBG("Setting Ramp Mode %d [0x%08X]",r_mode,ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
+	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_PERIOD,
+		ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
 	if (err) {
 		LOG_ERR("Setting ramp mode failed. Err %d",err);
 		return -EIO;
@@ -395,6 +395,8 @@ static int ktd2027_led_init(const struct device *dev)
 	const struct ktd2027_config *config = dev->config;
 	struct ktd2027_data *data = dev->data;
 	struct led_data *dev_data = &data->dev_data;
+	
+	DEVICE_MMIO_MAP(dev, K_MEM_CACHE_NONE);
 
 	if (!device_is_ready(config->bus.bus)) {
 		LOG_ERR("I2C device not ready");
@@ -407,17 +409,18 @@ static int ktd2027_led_init(const struct device *dev)
 	dev_data->min_brightness = KTD2027_MIN_BRIGHTNESS;
 	dev_data->max_brightness = KTD2027_MAX_BRIGHTNESS;
 	
-	/* Default Mode: Device always on, Function do nothing */
+	/* Default Mode: Device always on, Function full reset */
 	ktd2027_regs[KTD2027_REG_ENABLE_RST] = ((KTD2027_ON_MODE_ALWAYS_ON << 3U)| KTD2027_FUNC_DO_NOTHING);
 
-	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
-		ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+	LOG_DBG("Resetting KTD2027 [0x%01X]",ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+
+	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST, ktd2027_regs[KTD2027_REG_ENABLE_RST]);
 	if (err) {
 		LOG_ERR("Enabling KTD2027 LED chip failed. Err %d",err);
 		return -EIO;
 	}
 	
-	ktd2027_set_reset(dev, KTD2027_FUNC_RESET_FULL);
+	k_sleep(K_MSEC(10));
 	
 	/* All LEDs of at power up */
 	ktd2027_led_off(dev,0U);
