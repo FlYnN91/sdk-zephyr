@@ -42,6 +42,7 @@ LOG_MODULE_REGISTER(ktd2027);
 #define KTD2027_REG_L2_IOUT			0x07	/* Reset Value 0x4F */
 #define KTD2027_REG_L3_IOUT			0x08	/* Reset Value 0x4F */
 #define KTD2027_REG_L4_IOUT			0x09	/* Reset Value 0x4F */
+#define KTD2027_REG_COUNT			(KTD2027_REG_L4_IOUT+1U)
 
 #define KTD2027_CH_CONTROL_MASK		0x03
 
@@ -72,14 +73,14 @@ LOG_MODULE_REGISTER(ktd2027);
 
 
 struct ktd2027_config {
+	DEVICE_MMIO_ROM;
 	struct i2c_dt_spec bus;
 };
 
 struct ktd2027_data {
 	struct led_data dev_data;
+	uint8_t regs[KTD2027_REG_COUNT];
 };
-
-static uint8_t ktd2027_regs[KTD2027_REG_L4_IOUT+1U];
 
 static inline int ktd2027_led_on(const struct device *dev, uint32_t led)
 {
@@ -143,15 +144,17 @@ int ktd2027_set_reset(const struct device* dev, enum ktd2027_function reset)
 int ktd2027_set_scaling(const struct device* dev, enum ktd2027_ramp_scale scale)
 {
 	const struct ktd2027_config *config = dev->config;
-	// Reset scaling
-	ktd2027_regs[KTD2027_REG_ENABLE_RST] &= ~(3U << 5U);
-	// Set new scaling
-	ktd2027_regs[KTD2027_REG_ENABLE_RST] |= (scale << 5U);
+	struct ktd2027_data *data = dev->data;
 	
-	LOG_DBG("Setting Scaling %d [0x%08X]",scale,ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+	// Reset scaling
+	data->regs[KTD2027_REG_ENABLE_RST] &= ~(3U << 5U);
+	// Set new scaling
+	data->regs[KTD2027_REG_ENABLE_RST] |= (scale << 5U);
+	
+	LOG_DBG("Setting Scaling %d [0x%08X]",scale,data->regs[KTD2027_REG_ENABLE_RST]);
 	
 	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
-		ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+		data->regs[KTD2027_REG_ENABLE_RST]);
 	if (err) {
 		LOG_ERR("Setting scaling failed. Err %d",err);
 		return -EIO;
@@ -163,15 +166,17 @@ int ktd2027_set_scaling(const struct device* dev, enum ktd2027_ramp_scale scale)
 int ktd2027_set_enable_mode(const struct device* dev, enum ktd2027_function mode)
 {
 	const struct ktd2027_config *config = dev->config;
-	// Reset scaling
-	ktd2027_regs[KTD2027_REG_ENABLE_RST] &= ~(3U << 3U);
-	// Set new scaling
-	ktd2027_regs[KTD2027_REG_ENABLE_RST] |= (mode < 3U);
+	struct ktd2027_data *data = dev->data;
 	
-	LOG_DBG("Setting Enable Mode %d [0x%08X]",mode,ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+	// Reset scaling
+	data->regs[KTD2027_REG_ENABLE_RST] &= ~(3U << 3U);
+	// Set new scaling
+	data->regs[KTD2027_REG_ENABLE_RST] |= (mode < 3U);
+	
+	LOG_DBG("Setting Enable Mode %d [0x%08X]",mode,data->regs[KTD2027_REG_ENABLE_RST]);
 	
 	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST,
-		ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+		data->regs[KTD2027_REG_ENABLE_RST]);
 	if (err) {
 		LOG_ERR("Setting scaling failed.Err %d",err);
 		return -EIO;
@@ -183,15 +188,16 @@ int ktd2027_set_enable_mode(const struct device* dev, enum ktd2027_function mode
 int ktd2027_set_flash_period(const struct device* dev, uint16_t period_ms)
 {
 	const struct ktd2027_config *config = dev->config;
+	struct ktd2027_data *data = dev->data;
 	
 	uint8_t bin_period = ((period_ms - KTD2027_MIN_FLASH_PERIOD) / KTD2027_MIN_FLASH_PERIOD);
 	
-	ktd2027_regs[KTD2027_REG_FLASH_PERIOD] = bin_period & 0x7FU;
+	data->regs[KTD2027_REG_FLASH_PERIOD] = bin_period & 0x7FU;
 	
-	LOG_DBG("Setting Flash Period %d [0x%08X]",period_ms,ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
+	LOG_DBG("Setting Flash Period %d [0x%08X]",period_ms,data->regs[KTD2027_REG_FLASH_PERIOD]);
 	
 	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_PERIOD,
-		ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
+		data->regs[KTD2027_REG_FLASH_PERIOD]);
 	if (err) {
 		LOG_ERR("Setting flash period failed.Err %d",err);
 		return -EIO;
@@ -203,18 +209,19 @@ int ktd2027_set_flash_period(const struct device* dev, uint16_t period_ms)
 int ktd2027_set_ramp_mode(const struct device* dev, enum ktd2027_ramp_mode r_mode)
 {
 	const struct ktd2027_config *config = dev->config;
+	struct ktd2027_data *data = dev->data;
 	
 	if(KTD2027_RAMP_LOG_S == r_mode)
 	{
-		ktd2027_regs[KTD2027_REG_FLASH_PERIOD] &= ~(1U << 7U);
+		data->regs[KTD2027_REG_FLASH_PERIOD] &= ~(1U << 7U);
 	}
 	else
 	{
-		ktd2027_regs[KTD2027_REG_FLASH_PERIOD] |= (r_mode << 7U);
+		data->regs[KTD2027_REG_FLASH_PERIOD] |= (r_mode << 7U);
 	}
-	LOG_DBG("Setting Ramp Mode %d [0x%08X]",r_mode,ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
+	LOG_DBG("Setting Ramp Mode %d [0x%08X]",r_mode,data->regs[KTD2027_REG_FLASH_PERIOD]);
 	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_PERIOD,
-		ktd2027_regs[KTD2027_REG_FLASH_PERIOD]);
+		data->regs[KTD2027_REG_FLASH_PERIOD]);
 	if (err) {
 		LOG_ERR("Setting ramp mode failed. Err %d",err);
 		return -EIO;
@@ -226,12 +233,14 @@ int ktd2027_set_ramp_mode(const struct device* dev, enum ktd2027_ramp_mode r_mod
 int ktd2027_set_period_on_duty(const struct device* dev, uint32_t on_time)
 {	
 	const struct ktd2027_config *config = dev->config;
-	ktd2027_regs[KTD2027_REG_FLASH_ON_T1] = (255U / ( 100U / on_time));
+	struct ktd2027_data *data = dev->data;
 	
-	LOG_DBG("Setting T1 Period Duty %d [0x%08X]",on_time,ktd2027_regs[KTD2027_REG_FLASH_ON_T1]);
+	data->regs[KTD2027_REG_FLASH_ON_T1] = (255U / ( 100U / on_time));
+	
+	LOG_DBG("Setting T1 Period Duty %d [0x%08X]",on_time,data->regs[KTD2027_REG_FLASH_ON_T1]);
 	
 	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_FLASH_ON_T1,
-		ktd2027_regs[KTD2027_REG_FLASH_ON_T1]);
+		data->regs[KTD2027_REG_FLASH_ON_T1]);
 	if (err) {
 		LOG_ERR("Setting flash duty failed. Err %d",err);
 		return -EIO;
@@ -243,19 +252,20 @@ int ktd2027_set_period_on_duty(const struct device* dev, uint32_t on_time)
 int ktd2027_set_led_mode(const struct device* dev, enum ktd2027_led_channels led, enum ktd2027_led_mode on_mode)
 {
 	const struct ktd2027_config *config = dev->config;
+	struct ktd2027_data *data = dev->data;
 	
 	if (led >= KTD2027_CHANNEL_MAX) {
 		return -EINVAL;
 	}
 	
 	// LED OFF
-	ktd2027_regs[KTD2027_REG_CH_CONTROL] &= ~(3U << (led * 2U));
+	data->regs[KTD2027_REG_CH_CONTROL] &= ~(3U << (led * 2U));
 	// LED PWM
-	ktd2027_regs[KTD2027_REG_CH_CONTROL] |= on_mode << (led * 2U);
+	data->regs[KTD2027_REG_CH_CONTROL] |= on_mode << (led * 2U);
 	
-	LOG_DBG("Setting LED %d Mode %d [0x%08X]",led,on_mode,ktd2027_regs[KTD2027_REG_CH_CONTROL]);
+	LOG_DBG("Setting LED %d Mode %d [0x%08X]",led,on_mode,data->regs[KTD2027_REG_CH_CONTROL]);
 	
-	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,ktd2027_regs[KTD2027_REG_CH_CONTROL]);
+	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_CH_CONTROL,data->regs[KTD2027_REG_CH_CONTROL]);
 	if (err){
 		LOG_ERR("Failed to update Channel mode to DTK2027, Err %d",err);
 		return -EIO;
@@ -267,8 +277,9 @@ int ktd2027_set_led_mode(const struct device* dev, enum ktd2027_led_channels led
 int ktd2027_set_ramp_rate(const struct device* dev, uint16_t rise_period, uint16_t fall_period)
 {
 	const struct ktd2027_config *config = dev->config;
+	struct ktd2027_data *data = dev->data;
 	
-	uint8_t r_scale = ((ktd2027_regs[KTD2027_REG_ENABLE_RST]>>5U) & 0x3U);
+	uint8_t r_scale = ((data->regs[KTD2027_REG_ENABLE_RST]>>5U) & 0x3U);
 	uint16_t r_min, r_max = 0U;
 	uint16_t trise = 0;
 	uint16_t tfall = 0;
@@ -315,11 +326,11 @@ int ktd2027_set_ramp_rate(const struct device* dev, uint16_t rise_period, uint16
 		tfall = (fall_period /r_min);
 	}
 	
-	ktd2027_regs[KTD2027_REG_RAMP_RATE] = ((tfall & 0xFFU) << 4U) | (trise& 0xFFU);
+	data->regs[KTD2027_REG_RAMP_RATE] = ((tfall & 0xFFU) << 4U) | (trise& 0xFFU);
 	
-	LOG_DBG("Setting Rise (%d) %d, Fall (%d) %d, [0x%08X]",trise,rise_period,tfall,fall_period,ktd2027_regs[KTD2027_REG_RAMP_RATE]);
+	LOG_DBG("Setting Rise (%d) %d, Fall (%d) %d, [0x%08X]",trise,rise_period,tfall,fall_period,data->regs[KTD2027_REG_RAMP_RATE]);
 
-	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_RAMP_RATE,ktd2027_regs[KTD2027_REG_RAMP_RATE]);
+	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_RAMP_RATE,data->regs[KTD2027_REG_RAMP_RATE]);
 	if (err){
 		LOG_ERR("Failed to update ramp rates DTK2027. Err %d",err);
 		return -EIO;
@@ -331,6 +342,7 @@ int ktd2027_set_ramp_rate(const struct device* dev, uint16_t rise_period, uint16
 int ktd2027_set_max_current(const struct device* dev, enum ktd2027_led_channels led, uint8_t current_ma)
 {
 	const struct ktd2027_config *config = dev->config;
+	struct ktd2027_data *data = dev->data;
 	
 	if(current_ma > KTD2027_MAX_IOUT_uA)
 	{
@@ -361,11 +373,11 @@ int ktd2027_set_max_current(const struct device* dev, enum ktd2027_led_channels 
 		}
 	}
 	
-	ktd2027_regs[reg_idx] = ((current_ma * 1000U) / KTD2027_IOUT_STEP_uA);
+	data->regs[reg_idx] = ((current_ma * 1000U) / KTD2027_IOUT_STEP_uA);
 	
-	LOG_DBG("Setting LED %d mA %d, [0x%08X]",led,current_ma,ktd2027_regs[reg_idx]);
+	LOG_DBG("Setting LED %d mA %d, [0x%08X]",led,current_ma,data->regs[reg_idx]);
 	
-	int err = i2c_reg_write_byte_dt(&config->bus, reg_idx,ktd2027_regs[reg_idx]);
+	int err = i2c_reg_write_byte_dt(&config->bus, reg_idx,data->regs[reg_idx]);
 	if (err){
 		LOG_ERR("Failed to update Iout register DTK2027. Err %d",err);
 		return -EIO;
@@ -410,11 +422,11 @@ static int ktd2027_led_init(const struct device *dev)
 	dev_data->max_brightness = KTD2027_MAX_BRIGHTNESS;
 	
 	/* Default Mode: Device always on, Function full reset */
-	ktd2027_regs[KTD2027_REG_ENABLE_RST] = ((KTD2027_ON_MODE_ALWAYS_ON << 3U)| KTD2027_FUNC_DO_NOTHING);
+	data->regs[KTD2027_REG_ENABLE_RST] = (uint8_t)((KTD2027_ON_MODE_ALWAYS_ON << 3U)| KTD2027_FUNC_DO_NOTHING);
 
-	LOG_DBG("Resetting KTD2027 [0x%01X]",ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+	LOG_DBG("Resetting KTD2027 [0x%01X]",data->regs[KTD2027_REG_ENABLE_RST]);
 
-	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST, ktd2027_regs[KTD2027_REG_ENABLE_RST]);
+	int err = i2c_reg_write_byte_dt(&config->bus, KTD2027_REG_ENABLE_RST, data->regs[KTD2027_REG_ENABLE_RST]);
 	if (err) {
 		LOG_ERR("Enabling KTD2027 LED chip failed. Err %d",err);
 		return -EIO;
@@ -437,8 +449,11 @@ static const struct led_driver_api ktd2027_led_api = {
 	.blink = ktd2027_blink,
 };
 
+#define KTD2027(idx) DT_NODELABEL(ktd2027##idx)
+
 #define KTD2027_DEFINE(id)						\
 	static const struct ktd2027_config ktd2027_config_##id = {	\
+		DEVICE_MMIO_ROM_INIT(DT_DRV_INST(id)),\
 		.bus = I2C_DT_SPEC_INST_GET(id),			\
 	};								\
 									\
